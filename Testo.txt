@@ -1,0 +1,823 @@
+
+
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Il Mio Canzoniere</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- PDF.js per leggere PDF -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- mammoth.js per leggere .docx -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+<style>
+:root {
+  --bg: #100f0e;
+  --surface: #181715;
+  --surface2: #201e1c;
+  --border: #2e2b28;
+  --accent: #c9a96e;
+  --accent2: #8b6f47;
+  --text: #ede8de;
+  --muted: #7a736a;
+  --danger: #c0634a;
+  --success: #6a9e72;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.6;
+}
+
+/* ── LOCK SCREEN ── */
+#lockScreen {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 28px;
+}
+#lockScreen .logo {
+  text-align: center;
+}
+#lockScreen h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  font-style: italic;
+}
+#lockScreen .sub {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+.lock-box {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: min(300px, 88vw);
+}
+.lock-box input[type=password] {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  padding: 14px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.lock-box input[type=password]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201,169,110,0.1);
+}
+#lockError {
+  color: var(--danger);
+  font-size: 11px;
+  min-height: 16px;
+  letter-spacing: 0.05em;
+}
+.lock-hint {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  background: var(--accent);
+  color: #100f0e;
+  border: none;
+  padding: 9px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn:hover { background: #d9bc88; }
+.btn:active { transform: scale(0.97); }
+.btn.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn.ghost:hover { color: var(--text); border-color: var(--accent2); background: var(--surface2); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+.btn.sm { padding: 6px 13px; font-size: 11px; }
+.btn.full { width: 100%; }
+
+/* ── APP ── */
+#app { display: none; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
+
+/* ── HEADER ── */
+header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface);
+  position: sticky; top: 0; z-index: 10;
+}
+header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  color: var(--accent);
+  font-style: italic;
+  flex-shrink: 0;
+}
+.search-wrap {
+  flex: 1; min-width: 160px;
+  position: relative;
+}
+.search-wrap input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px 8px 34px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-wrap input::placeholder { color: var(--muted); }
+.search-wrap input:focus { border-color: var(--accent2); }
+.search-wrap .ico {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%); color: var(--muted); pointer-events: none;
+}
+.count-badge {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+/* ── LAYOUT ── */
+.layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 57px); }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: min(260px, 42vw);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.song-item {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.song-item:hover { background: var(--surface2); }
+.song-item.active {
+  background: var(--surface2);
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+}
+.song-item .st { font-family: 'Playfair Display', serif; font-size: 14px; color: var(--text); line-height: 1.3; }
+.song-item .sa { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
+.empty-list {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 2;
+}
+
+/* ── MAIN PANEL ── */
+#main {
+  flex: 1; overflow-y: auto;
+  padding: 28px 32px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.panel-meta { display: flex; flex-direction: column; gap: 4px; }
+.panel-title { font-family: 'Playfair Display', serif; font-size: 2rem; color: var(--text); line-height: 1.2; }
+.panel-artist { color: var(--accent); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; }
+.panel-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.lyrics-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 28px 32px;
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  line-height: 2.1;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 200px;
+}
+.welcome {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  color: var(--muted); text-align: center;
+}
+.welcome-icon { font-size: 3rem; opacity: 0.15; }
+.welcome p { font-size: 12px; line-height: 1.9; }
+
+/* ── MODAL ── */
+#modal {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.8);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+#modal.open { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: min(620px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  display: flex; flex-direction: column; gap: 18px;
+  position: relative;
+}
+.modal-box h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; color: var(--accent); font-style: italic;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
+.field input, .field textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+.field input:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { min-height: 220px; line-height: 1.8; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── FILE DROP ZONE ── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  padding: 22px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(201,169,110,0.04);
+  color: var(--text);
+}
+.drop-zone input[type=file] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-zone .dz-icon { font-size: 1.8rem; margin-bottom: 6px; opacity: 0.4; }
+.file-status {
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 3px;
+  display: none;
+}
+.file-status.ok { background: rgba(106,158,114,0.15); color: var(--success); border: 1px solid rgba(106,158,114,0.3); display: block; }
+.file-status.err { background: rgba(192,99,74,0.15); color: var(--danger); border: 1px solid rgba(192,99,74,0.3); display: block; }
+.file-status.loading { background: rgba(201,169,110,0.1); color: var(--accent); border: 1px solid rgba(201,169,110,0.2); display: block; }
+
+/* ── SETTINGS PANEL ── */
+#settingsModal {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.8);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#settingsModal.open { display: flex; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 999;
+  white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── DIVIDER ── */
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); font-size: 10px; letter-spacing: 0.1em;
+}
+.divider::before, .divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 580px) {
+  #sidebar { width: 120px; }
+  .song-item .sa { display: none; }
+  #main { padding: 16px; }
+  .lyrics-box { font-size: 15px; padding: 18px; }
+  header h1 { font-size: 1.1rem; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+
+<div id="lockScreen">
+  <div class="logo">
+    <h1>Il Mio Canzoniere</h1>
+    <div class="sub">archivio privato</div>
+  </div>
+  <div class="lock-box">
+    <input type="password" id="pwdInput" placeholder="••••••" autocomplete="off" />
+    <div id="lockError"></div>
+    <button class="btn full" onclick="unlock()">Entra</button>
+    <div class="lock-hint">Prima volta? La password predefinita è <strong>1234</strong><br>Puoi cambiarla dalle impostazioni.</div>
+  </div>
+</div>
+
+<!-- APP -->
+
+<div id="app">
+  <header>
+    <h1>♪ Il Mio Canzoniere</h1>
+    <div class="search-wrap">
+      <span class="ico">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </span>
+      <input type="text" id="searchInput" placeholder="Cerca titolo o artista…" oninput="renderList()">
+    </div>
+    <span class="count-badge" id="countBadge">0 canzoni</span>
+    <button class="btn sm" onclick="openModal()">+ Aggiungi</button>
+    <button class="btn ghost sm" onclick="openSettings()">⚙</button>
+  </header>
+
+  <div class="layout">
+    <div id="sidebar"></div>
+    <div id="main">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">♫</div>
+        <p>Nessuna canzone selezionata.<br>Aggiungine una con il pulsante <strong>+ Aggiungi</strong><br>o selezionane una dalla lista.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE AGGIUNGI/MODIFICA -->
+
+<div id="modal">
+  <div class="modal-box">
+    <h2 id="modalTitle">Nuova canzone</h2>
+
+```
+<div class="field">
+  <label>Titolo *</label>
+  <input type="text" id="fTitle" placeholder="Es. Come un pittore" />
+</div>
+<div class="field">
+  <label>Artista</label>
+  <input type="text" id="fArtist" placeholder="Es. Modà" />
+</div>
+
+<div class="divider">oppure carica un file</div>
+
+<!-- DROP ZONE -->
+<div class="drop-zone" id="dropZone"
+     ondragover="dzDragOver(event)" ondragleave="dzDragLeave(event)" ondrop="dzDrop(event)">
+  <div class="dz-icon">📄</div>
+  <div>Trascina qui un file <strong>.txt</strong>, <strong>.pdf</strong> o <strong>.docx</strong><br>oppure clicca per sceglierlo</div>
+  <input type="file" id="fileInput" accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onchange="handleFile(this.files[0])">
+</div>
+<div class="file-status" id="fileStatus"></div>
+
+<div class="field">
+  <label>Testo (modifica manualmente se vuoi)</label>
+  <textarea id="fLyrics" placeholder="Incolla o scrivi il testo qui…"></textarea>
+</div>
+
+<div class="modal-actions">
+  <button class="btn ghost" onclick="closeModal()">Annulla</button>
+  <button class="btn" onclick="saveSong()">Salva</button>
+</div>
+```
+
+  </div>
+</div>
+
+<!-- MODALE IMPOSTAZIONI -->
+
+<div id="settingsModal">
+  <div class="modal-box" style="max-width:400px">
+    <h2>Impostazioni</h2>
+    <div class="field">
+      <label>Password attuale</label>
+      <input type="password" id="sPwdOld" placeholder="••••••" />
+    </div>
+    <div class="field">
+      <label>Nuova password</label>
+      <input type="password" id="sPwdNew" placeholder="••••••" />
+    </div>
+    <div class="field">
+      <label>Conferma nuova password</label>
+      <input type="password" id="sPwdConf" placeholder="••••••" />
+    </div>
+    <div id="pwdMsg" style="font-size:11px;min-height:16px;"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeSettings()">Chiudi</button>
+      <button class="btn" onclick="changePassword()">Cambia password</button>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <span style="font-size:11px;color:var(--muted);">Esporta tutto il canzoniere come JSON</span>
+      <button class="btn ghost sm" onclick="exportData()">Esporta</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <span style="font-size:11px;color:var(--muted);">Importa da file JSON</span>
+      <label class="btn ghost sm" style="cursor:pointer;">
+        Importa
+        <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════
+//  STORAGE
+// ══════════════════════════════
+const STORE_KEY  = 'canzoniere_songs';
+const PWD_KEY    = 'canzoniere_pwd';
+const DEFAULT_PWD = '1234';
+
+function getHash(s) {
+  // semplice hash djb2
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
+function getPwd() { return localStorage.getItem(PWD_KEY) || getHash(DEFAULT_PWD); }
+function getSongs() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } }
+function setSongs(arr) { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+
+// ══════════════════════════════
+//  LOCK
+// ══════════════════════════════
+document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+function unlock() {
+  const val = document.getElementById('pwdInput').value;
+  const stored = getPwd();
+  const isDefault = stored === getHash(DEFAULT_PWD) && val === DEFAULT_PWD;
+  const isMatch   = stored === getHash(val);
+  if (isDefault || isMatch) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    renderList();
+  } else {
+    const el = document.getElementById('lockError');
+    el.textContent = 'Password errata.';
+    document.getElementById('pwdInput').value = '';
+    setTimeout(() => el.textContent = '', 2000);
+  }
+}
+
+// ══════════════════════════════
+//  LISTA
+// ══════════════════════════════
+let currentId = null;
+
+function renderList() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const songs = getSongs().filter(s =>
+    s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q)
+  );
+  const sidebar = document.getElementById('sidebar');
+  document.getElementById('countBadge').textContent = getSongs().length + ' canzon' + (getSongs().length === 1 ? 'e' : 'i');
+  if (!songs.length) {
+    sidebar.innerHTML = `<div class="empty-list">Nessuna canzone trovata.</div>`;
+    return;
+  }
+  sidebar.innerHTML = songs.map(s => `
+    <div class="song-item ${s.id === currentId ? 'active' : ''}" onclick="selectSong('${s.id}')">
+      <div class="st">${esc(s.title)}</div>
+      ${s.artist ? `<div class="sa">${esc(s.artist)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function selectSong(id) {
+  currentId = id;
+  renderList();
+  const s = getSongs().find(x => x.id === id);
+  if (!s) return;
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="panel-meta">
+      <div class="panel-title">${esc(s.title)}</div>
+      ${s.artist ? `<div class="panel-artist">${esc(s.artist)}</div>` : ''}
+    </div>
+    <div class="panel-bar">
+      <button class="btn sm" onclick="openModal('${s.id}')">✏ Modifica</button>
+      <button class="btn danger sm" onclick="deleteSong('${s.id}')">🗑 Elimina</button>
+    </div>
+    <div class="lyrics-box">${esc(s.lyrics)}</div>
+  `;
+}
+
+function deleteSong(id) {
+  if (!confirm('Eliminare questa canzone?')) return;
+  const songs = getSongs().filter(s => s.id !== id);
+  setSongs(songs);
+  currentId = null;
+  document.getElementById('main').innerHTML = `<div class="welcome" id="welcome"><div class="welcome-icon">♫</div><p>Seleziona una canzone dalla lista.</p></div>`;
+  renderList();
+  showToast('Canzone eliminata.');
+}
+
+// ══════════════════════════════
+//  MODAL AGGIUNGI / MODIFICA
+// ══════════════════════════════
+let editingId = null;
+
+function openModal(id) {
+  editingId = id || null;
+  document.getElementById('modalTitle').textContent = id ? 'Modifica canzone' : 'Nuova canzone';
+  clearFileStatus();
+  if (id) {
+    const s = getSongs().find(x => x.id === id);
+    document.getElementById('fTitle').value  = s.title;
+    document.getElementById('fArtist').value = s.artist || '';
+    document.getElementById('fLyrics').value = s.lyrics;
+  } else {
+    document.getElementById('fTitle').value  = '';
+    document.getElementById('fArtist').value = '';
+    document.getElementById('fLyrics').value = '';
+  }
+  document.getElementById('fileInput').value = '';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+}
+
+function saveSong() {
+  const title  = document.getElementById('fTitle').value.trim();
+  const artist = document.getElementById('fArtist').value.trim();
+  const lyrics = document.getElementById('fLyrics').value.trim();
+  if (!title) { alert('Il titolo è obbligatorio.'); return; }
+  const songs = getSongs();
+  if (editingId) {
+    const idx = songs.findIndex(s => s.id === editingId);
+    if (idx !== -1) { songs[idx].title = title; songs[idx].artist = artist; songs[idx].lyrics = lyrics; }
+  } else {
+    songs.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,5), title, artist, lyrics });
+  }
+  setSongs(songs);
+  closeModal();
+  renderList();
+  if (editingId || currentId) selectSong(editingId || currentId);
+  showToast(editingId ? 'Canzone aggiornata.' : 'Canzone aggiunta!');
+}
+
+// ══════════════════════════════
+//  FILE IMPORT
+// ══════════════════════════════
+function dzDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); }
+function dzDragLeave(e) { document.getElementById('dropZone').classList.remove('dragover'); }
+function dzDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+function setFileStatus(type, msg) {
+  const el = document.getElementById('fileStatus');
+  el.className = 'file-status ' + type;
+  el.textContent = msg;
+}
+function clearFileStatus() {
+  const el = document.getElementById('fileStatus');
+  el.className = 'file-status';
+  el.textContent = '';
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  setFileStatus('loading', '⏳ Lettura file in corso…');
+
+  // Auto-fill titolo se il campo è vuoto
+  if (!document.getElementById('fTitle').value.trim()) {
+    let base = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+    document.getElementById('fTitle').value = base;
+  }
+
+  try {
+    if (name.endsWith('.txt')) {
+      const text = await file.text();
+      document.getElementById('fLyrics').value = text;
+      setFileStatus('ok', '✓ File .txt caricato correttamente.');
+    }
+    else if (name.endsWith('.pdf')) {
+      await readPDF(file);
+    }
+    else if (name.endsWith('.docx')) {
+      await readDOCX(file);
+    }
+    else {
+      setFileStatus('err', '⚠ Formato non supportato. Usa .txt, .pdf o .docx.');
+    }
+  } catch(err) {
+    setFileStatus('err', '⚠ Errore nella lettura: ' + err.message);
+  }
+}
+
+async function readPDF(file) {
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+  let fullText = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(i => i.str).join(' ');
+    fullText += pageText + '\n';
+  }
+  document.getElementById('fLyrics').value = fullText.trim();
+  setFileStatus('ok', `✓ PDF letto (${pdf.numPages} pagina/e).`);
+}
+
+async function readDOCX(file) {
+  const ab = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: ab });
+  document.getElementById('fLyrics').value = result.value.trim();
+  setFileStatus('ok', '✓ File .docx caricato correttamente.');
+}
+
+// ══════════════════════════════
+//  IMPOSTAZIONI / PASSWORD
+// ══════════════════════════════
+function openSettings() { document.getElementById('settingsModal').classList.add('open'); }
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+  ['sPwdOld','sPwdNew','sPwdConf'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pwdMsg').textContent = '';
+}
+
+function changePassword() {
+  const old  = document.getElementById('sPwdOld').value;
+  const nw   = document.getElementById('sPwdNew').value;
+  const conf = document.getElementById('sPwdConf').value;
+  const msg  = document.getElementById('pwdMsg');
+
+  const stored  = getPwd();
+  const isDefault = stored === getHash(DEFAULT_PWD) && old === DEFAULT_PWD;
+  if (!isDefault && stored !== getHash(old)) {
+    msg.style.color = 'var(--danger)'; msg.textContent = 'Password attuale errata.'; return;
+  }
+  if (nw.length < 3) { msg.style.color = 'var(--danger)'; msg.textContent = 'Nuova password troppo corta (min 3 caratteri).'; return; }
+  if (nw !== conf)   { msg.style.color = 'var(--danger)'; msg.textContent = 'Le due password non coincidono.'; return; }
+  localStorage.setItem(PWD_KEY, getHash(nw));
+  msg.style.color = 'var(--success)'; msg.textContent = '✓ Password cambiata!';
+  setTimeout(closeSettings, 1500);
+}
+
+// ══════════════════════════════
+//  EXPORT / IMPORT
+// ══════════════════════════════
+function exportData() {
+  const data = JSON.stringify({ songs: getSongs() }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'canzoniere_backup.json';
+  a.click();
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const obj = JSON.parse(evt.target.result);
+      if (!Array.isArray(obj.songs)) throw new Error('Formato non valido.');
+      const current = getSongs();
+      const merged = [...current];
+      obj.songs.forEach(s => {
+        if (!merged.find(x => x.id === s.id)) merged.push(s);
+      });
+      setSongs(merged);
+      renderList();
+      showToast(`Importazione completata: ${obj.songs.length} canzoni.`);
+      closeSettings();
+    } catch(err) {
+      alert('Errore importazione: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ══════════════════════════════
+//  UTILITIES
+// ══════════════════════════════
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// chiudi modal con ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeSettings();
+  }
+});
+// chiudi modal cliccando fuori
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.getElementById('settingsModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('settingsModal')) closeSettings();
+});
+</script>
+
+</body>
+</html>
