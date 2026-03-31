@@ -92,11 +92,12 @@ white-space: nowrap;
 .btn:hover { background: #6a2f8f; }
 .btn:active { transform: scale(0.97); }
 .btn.ghost {
-background: transparent;
-color: var(–muted);
-border: 1px solid var(–border);
+background: var(–surface2);
+color: var(–accent);
+border: 2px solid var(–accent);
+font-weight: 500;
 }
-.btn.ghost:hover { color: var(–text); background: var(–surface2); }
+.btn.ghost:hover { background: var(–accent); color: #fff; }
 .btn.danger { background: transparent; color: var(–danger); border: 1px solid var(–danger); }
 .btn.danger:hover { background: var(–danger); color: #fff; }
 .btn.sm { padding: 7px 14px; font-size: 11px; }
